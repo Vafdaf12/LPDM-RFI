@@ -1,6 +1,6 @@
 ddpm_name: lpdm_lol
-pred_path: ../test/eta/*.png
-cond_path: ../test/dark/*.png
+pred_path: ../test/eta/*
+cond_path: ../test/dark/*
 write_path: ../test/denoised/
 description: Denoise folders
 s: 30

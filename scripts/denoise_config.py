@@ -1,11 +1,11 @@
 # Must run from within the 'scripts' directory
 import os, sys
-import PIL
 import glob
 import torch
 import numpy as np
 from omegaconf import OmegaConf
 from PIL import Image
+
 from tqdm import tqdm
 from einops import rearrange
 from pytorch_lightning import seed_everything
@@ -16,6 +16,7 @@ sys.path.append(os.path.abspath(os.path.join('..', 'external', 'taming-transform
 sys.path.append(os.path.abspath(os.path.join('..', 'external', 'clip')))
 from ldm.util import instantiate_from_config
 
+
 def tensor_to_pil(t, mode='RGB'):
     if t.ndim == 4:
         assert t.shape[0] == 1
@@ -23,7 +24,19 @@ def tensor_to_pil(t, mode='RGB'):
     t = torch.clamp((t + 1.0) / 2.0, min=0.0, max=1.0)
     img = 255. * rearrange(t.detach().cpu().numpy(), 'c h w -> h w c')
     return Image.fromarray(img.astype(np.uint8), mode=mode).convert('RGB')
-    
+
+def tensor_to_npy(t):
+    arr = t.cpu().numpy()
+    return (arr / 2) + 0.5
+
+def is_numpy_file(path: str) -> bool:
+    if not os.path.isfile(path):
+        return False
+
+    ext = os.path.splitext(path)[1]
+    return ext in (".npy", ".npz")
+
+
 def pil_to_tensor_in_range(t):
     return T.ToTensor()(t) * 2.0 - 1.0
 
@@ -68,14 +81,14 @@ seed_everything(0)
 
 parser = argparse.ArgumentParser(prog = 'Denoise Config', description = 'Denoise folders of images based on a configuration file.')
 
-parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise.yaml', help='a string path to the test configuration file') 
-parser.add_argument('-s', '--skip_large', action='store_true', help='a flag indicating whether to skip large images which are >2000 pixels in width or height') 
-parser.add_argument('-c', '--cut_large', action='store_true', help='a flag indicating whether to cut large images which are >2000 pixels in width or height. Has no effect if skip_large is set.') 
-parser.add_argument('-d', '--device', type=str, help='device to move the model and tensors to. Either cuda or cpu.', default='cpu') 
-parser.add_argument('-o', '--overwrite', action='store_true', help='overwrite existing images rather than skipping the denoising process.') 
+parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise.yaml', help='a string path to the test configuration file')
+parser.add_argument('-s', '--skip_large', action='store_true', help='a flag indicating whether to skip large images which are >2000 pixels in width or height')
+parser.add_argument('-c', '--cut_large', action='store_true', help='a flag indicating whether to cut large images which are >2000 pixels in width or height. Has no effect if skip_large is set.')
+parser.add_argument('-d', '--device', type=str, help='device to move the model and tensors to. Either cuda or cpu.', default='cpu')
+parser.add_argument('-o', '--overwrite', action='store_true', help='overwrite existing images rather than skipping the denoising process.')
 args = parser.parse_args()
 
-config_path = args.base_path    
+config_path = args.base_path
 config = OmegaConf.load(config_path)
 subdir = os.path.join(config.write_path, config.ddpm_name, f'phi{config.phi}_s{config.s}')
 os.makedirs(subdir, exist_ok=True)
@@ -89,6 +102,7 @@ assert len(pred_paths) == len(cond_paths), f"Number of images in folders do not 
 
 for p, c in zip(pred_paths, cond_paths):
     assert os.path.splitext(os.path.basename(p))[0] == os.path.splitext(os.path.basename(c))[0], f'{os.path.basename(p)} != {os.path.basename(c)}'
+    assert is_numpy_file(p) == is_numpy_file(c)
 
 print(f'Denoising {config_path}...')
 
@@ -107,13 +121,24 @@ def pad_to_multiple(im, mul=16):
 
 with torch.no_grad():
     for p_path, c_path  in tqdm(zip(pred_paths, cond_paths), total=len(pred_paths)):
-        save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.png')
+        if is_numpy_file(p_path):
+            save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.npy')
+        else:
+            save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.png')
+
         if os.path.exists(save_path) and not args.overwrite:
             print(f'File {save_path} already exists, skipping...')
             continue
 
-        p, c = pil_to_tensor_in_range(Image.open(p_path)).unsqueeze(0), pil_to_tensor_in_range(Image.open(c_path)).unsqueeze(0)
+        if is_numpy_file(p_path):
+            p, c = np.load(p_path), np.load(c_path)
+            p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
+        else:
+            p, c = Image.open(p_path), Image.open(c_path)
+
+        p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
         p, c = p.to(device), c.to(device)
+        print(p.shape)
         if  p.shape[-1] >= 2000 or p.shape[-2] >=2000:
                 if args.skip_large:
                     print(f'Skipping large image of size: {p.shape}')
@@ -140,9 +165,13 @@ with torch.no_grad():
                         denoised_pieces.append(x0)
                     x0 = torch.cat(denoised_pieces, dim=-1) # Concat on width
                     x0 = clamp_ldm_range(x0)
-                    tensor_to_pil(x0).save(save_path)
+
+                    if is_numpy_file(c_path):
+                        np.save(save_path, tensor_to_npy(x0))
+                    else:
+                        tensor_to_pil(x0).save(save_path)
                     continue
-        
+
         t = torch.tensor([config.phi], dtype=torch.long, device=device)
         try:
             noise_pred = ddpm.model(torch.cat([p, c], dim=1), t).detach()
@@ -154,6 +183,9 @@ with torch.no_grad():
             x0 = x0[..., :h, :w]
 
         x0 = clamp_ldm_range(x0)
-        tensor_to_pil(x0).save(save_path)
+        if is_numpy_file(c_path):
+            np.save(save_path, tensor_to_npy(x0))
+        else:
+            tensor_to_pil(x0).save(save_path)
 
 print("Denoising Complete!")
