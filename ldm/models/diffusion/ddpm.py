@@ -19,6 +19,7 @@ from torchvision.utils import make_grid
 from pytorch_lightning.utilities import rank_zero_only
 import random
 from enum import Enum
+from torchmetrics.image.psnr import PeakSignalNoiseRatio
 
 from ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
 from ldm.modules.ema import LitEma
@@ -45,6 +46,7 @@ def uniform_on_device(r1, r2, shape, device):
 class LossType(Enum):
     L1 = "l1"
     L2 = "l2"
+    PSNR = "psnr"
 
 class DDPM(pl.LightningModule):
     # classic DDPM with Gaussian diffusion, in image space
@@ -297,6 +299,12 @@ class DDPM(pl.LightningModule):
                 loss = torch.nn.functional.mse_loss(target, pred)
             else:
                 loss = torch.nn.functional.mse_loss(target, pred, reduction='none')
+        elif self.loss_type == LossType.PSNR:
+            psnr = PeakSignalNoiseRatio()
+            if mean:
+                loss = psnr(pred, target)
+            else:
+                loss = psnr(pred, target, reduction='none')
         else:
             raise NotImplementedError(f"unhandled loss type '{self.loss_type}'")
 
