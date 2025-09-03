@@ -8,7 +8,7 @@ model:
     timesteps: 1000
     first_stage_key: t
     cond_key: x
-    image_size: 256 # This is the latent size for sampling noise
+    image_size: 128 # This is the latent size for sampling noise
     channels: 1
     monitor: val/loss_simple_ema
     original_elbo_weight: 0.001 # Apply elbo to loss
@@ -30,7 +30,7 @@ model:
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 256 # unused
+        image_size: 128 # unused
         in_channels: 2 # Changed because we concat ( underexposed + c )
         out_channels: 1
         model_channels: 128
@@ -51,15 +51,19 @@ data:
     num_workers: 10
     wrap: false
     train:
-      target: ldm.data.lol.LOLTrain
+      target: ldm.data.rfi.BaselineDataset
       params:
-        dir_data: datasets/
-        crop_size: 256
+        polarization: 0
+        count: 500
+        offset: 0
+        dataset: datasets/output2.h5
     validation:
-      target: ldm.data.lol.LOLValidation
+      target: ldm.data.rfi.BaselineDataset
       params:
-        dir_data: datasets/
-        crop_size: 256
+        polarization: 0
+        offset: 500
+        count: 50 
+        dataset: datasets/output2.h5
 
 
 lightning:
