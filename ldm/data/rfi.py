@@ -31,11 +31,20 @@ class BaselineDataset(Dataset):
 
     def __getitem__(self, idx: int) -> np.ndarray:
         idx += self.offset
+
         data = self.file[f"{self.baselines[idx]}/CORRUPTED_DATA"][:, :, self.polarization]
         clean_data = self.file[f"{self.baselines[idx]}/CORRECTED_DATA"][:, :, self.polarization]
+        flags = self.file[f"{self.baselines[idx]}/FLAG"][:, :, self.polarization]
+
         assert data.shape == clean_data.shape, f"Data shape is different: {data.shape} != {clean_data.shape}"
 
+
         data, clean_data = np.abs(data), np.abs(clean_data)
+
+        mean, std = data[~flags].mean(), data[~flags].std()
+        data = (data - mean) / std
+        clean_data = (clean_data - mean) / std
+
         data, clean_data = self.transforms(np.dstack((data, clean_data)))
 
         return {

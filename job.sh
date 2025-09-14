@@ -23,7 +23,7 @@ python main.py --base configs/train/lpdm_rfi.yaml --gpu 1 --resume logs/$(ls log
 
 
 # Start training from scratch
-#python main.py --base configs/train/lpdm_rfi.yaml
+#python main.py --base configs/train/lpdm_rfi.yaml --gpu 1
 
 
 
