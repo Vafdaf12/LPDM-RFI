@@ -26,8 +26,7 @@ def tensor_to_pil(t, mode='RGB'):
     return Image.fromarray(img.astype(np.uint8), mode=mode).convert('RGB')
 
 def tensor_to_npy(t):
-    arr = t.cpu().numpy()
-    return (arr / 2) + 0.5
+    return t.cpu().numpy()
 
 def is_numpy_file(path: str) -> bool:
     if not os.path.isfile(path):
@@ -36,6 +35,8 @@ def is_numpy_file(path: str) -> bool:
     ext = os.path.splitext(path)[1]
     return ext in (".npy", ".npz")
 
+def numpy_to_tensor(t):
+    return T.ToTensor()(t)
 
 def pil_to_tensor_in_range(t):
     return T.ToTensor()(t) * 2.0 - 1.0
@@ -133,10 +134,11 @@ with torch.no_grad():
         if is_numpy_file(p_path):
             p, c = np.load(p_path), np.load(c_path)
             p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
+            p, c = numpy_to_tensor(p).unsqueeze(0), numpy_to_tensor(c).unsqueeze(0)
         else:
             p, c = Image.open(p_path), Image.open(c_path)
+            p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
 
-        p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
         p, c = p.to(device), c.to(device)
         print(p.shape)
         if  p.shape[-1] >= 2000 or p.shape[-2] >=2000:
