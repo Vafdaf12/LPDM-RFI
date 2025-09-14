@@ -1,4 +1,5 @@
 import h5py
+import numpy as np
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
@@ -17,28 +18,35 @@ if __name__ == "__main__":
     args = parser.parse_args()
     infile = args.input
     baseline = args.base
-    outfile = args.output
+    name = args.name
     polarization = 0 # TODO: Add CLI argument for this
 
     with h5py.File(infile, "r+") as file:
         # Data coming from the telescope
-        dark = file[f"{baselines}/CORRUPTED_DATA"][:, :, polarization]
+        dark = file[f"{baseline}/CORRUPTED_DATA"][:, :, polarization]
         dark = np.abs(dark)
 
         # CLEAN model predicted from corrupted data
-        model_data = file[f"{baselines}/MODEL_DATA"][:, :, polarization]
+        model_data = file[f"{baseline}/MODEL_DATA"][:, :, polarization]
         model_data = np.abs(model_data)
 
         # In-painted result
         eta = np.copy(dark)
-        flags = file[f"{baselines}/FLAG"][:, :, polarization]
+        flags = file[f"{baseline}/FLAG"][:, :, polarization]
         eta[flags] =  model_data[flags]
 
 
+        # Standardize the result according to the telescope response
         mean, std = dark[~flags].mean(), dark[~flags].std()
         dark = (dark - mean) / std
         eta = (eta - mean) / std
 
-        print(dark.shape, eta.shape)
+        # Expand dimensions to be in form WxHx1
+        dark = np.expand_dims(dark, axis=2)
+        eta = np.expand_dims(eta, axis=2)
+
+        # Finally, write to file
+        np.save(f"{name}-dark.npy", dark, allow_pickle=False)
+        np.save(f"{name}-eta.npy", eta, allow_pickle=False)
 
 

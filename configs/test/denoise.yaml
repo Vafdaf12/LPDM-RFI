@@ -1,4 +1,4 @@
-ddpm_name: lpdm_lol
+ddpm_name: lpdm_rfi
 pred_path: ../test/eta/*
 cond_path: ../test/dark/*
 write_path: ../test/denoised/

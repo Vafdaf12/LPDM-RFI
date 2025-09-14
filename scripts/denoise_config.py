@@ -9,6 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 from einops import rearrange
 from pytorch_lightning import seed_everything
+import torch
 import torchvision.transforms as T
 import argparse
 sys.path.append(os.path.abspath('..'))
@@ -26,7 +27,11 @@ def tensor_to_pil(t, mode='RGB'):
     return Image.fromarray(img.astype(np.uint8), mode=mode).convert('RGB')
 
 def tensor_to_npy(t):
-    return t.cpu().numpy()
+    arr = t.cpu().numpy()[0]
+    arr = np.swapaxes(arr, 0, 2)
+    return arr
+
+
 
 def is_numpy_file(path: str) -> bool:
     if not os.path.isfile(path):
@@ -36,7 +41,9 @@ def is_numpy_file(path: str) -> bool:
     return ext in (".npy", ".npz")
 
 def numpy_to_tensor(t):
-    return T.ToTensor()(t)
+
+    return torch.from_numpy(t)
+    #return T.ToTensor()(t)
 
 def pil_to_tensor_in_range(t):
     return T.ToTensor()(t) * 2.0 - 1.0
@@ -135,9 +142,15 @@ with torch.no_grad():
             p, c = np.load(p_path), np.load(c_path)
             p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
             p, c = numpy_to_tensor(p).unsqueeze(0), numpy_to_tensor(c).unsqueeze(0)
+            #p, c = numpy_to_tensor(p), numpy_to_tensor(c)
+            print(p.shape, c.shape)
+            #raise "Numpy eish"
         else:
             p, c = Image.open(p_path), Image.open(c_path)
             p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
+            print(p.shape, c.shape)
+            continue
+            #raise "Picture eish"
 
         p, c = p.to(device), c.to(device)
         print(p.shape)
@@ -166,11 +179,11 @@ with torch.no_grad():
                             x0 = x0[..., :h, :w]
                         denoised_pieces.append(x0)
                     x0 = torch.cat(denoised_pieces, dim=-1) # Concat on width
-                    x0 = clamp_ldm_range(x0)
 
                     if is_numpy_file(c_path):
                         np.save(save_path, tensor_to_npy(x0))
                     else:
+                        x0 = clamp_ldm_range(x0)
                         tensor_to_pil(x0).save(save_path)
                     continue
 
@@ -184,10 +197,10 @@ with torch.no_grad():
             x0 = ddpm.predict_start_from_noise(pad_to_multiple(p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
             x0 = x0[..., :h, :w]
 
-        x0 = clamp_ldm_range(x0)
         if is_numpy_file(c_path):
             np.save(save_path, tensor_to_npy(x0))
         else:
+            x0 = clamp_ldm_range(x0)
             tensor_to_pil(x0).save(save_path)
 
 print("Denoising Complete!")
