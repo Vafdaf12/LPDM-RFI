@@ -1,7 +1,7 @@
 ddpm_name: lpdm_rfi
-pred_path: ../test/eta/*
-cond_path: ../test/dark/*
-write_path: ../test/denoised/
+pred_path: ../tmp/eta/*
+cond_path: ../tmp/dark/*
+write_path: ../tmp/pred/
 description: Denoise folders
-s: 30
-phi: 300
+s: 10
+phi: 200
