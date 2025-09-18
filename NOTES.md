@@ -26,4 +26,3 @@ following processing steps are required:
 2. Swap the W and C axes to get a CxHxW image.
 3. Convert this array to a tensor
 4. Perform an unsqueeze on the tensor to get 1-sized batch
-

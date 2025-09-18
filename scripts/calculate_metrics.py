@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 def evaluate(pred: np.ndarray, target: np.ndarray) -> dict:
     return {
-        "psnr": peak_signal_noise_ratio(pred, target),
+        "psnr": peak_signal_noise_ratio(pred, target, data_range=target.max()),
         "mae": np.mean(np.absolute(pred - target))
     }
 
