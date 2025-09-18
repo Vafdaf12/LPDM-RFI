@@ -1,5 +1,5 @@
 import numpy as np
-import h5py
+from pathlib import Path
 
 import argparse
 from tqdm import tqdm
@@ -12,9 +12,6 @@ DASH_COUNT = (1, 10)
 
 BLOCK_BRIGHTNESS = (0.10, 0.50)
 BLOCK_COUNT = (1, 3)
-
-FLAG_COL = "FLAG"
-OUTPUT_COL = "CORRUPTED_DATA"
 
 def corrupt_images(images: np.ndarray) -> np.ndarray:
     corrupted_images = images.copy()
@@ -83,14 +80,12 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(
         prog="Baseline RFI Corruption",
-        description="Corrupts spectrograms in an HDF5 dataset with random RFI",
-        epilog=f"Corruption data will be written to {FLAG_COL} and {OUTPUT_COL} dataset for each baseline."
+        description="corrupt baselines random RFI",
     )
-
-
-    parser.add_argument("input", help="HDF5 file to corrupt")
-    parser.add_argument("colname", help="Name of the column to corrupt")
-
+    
+    parser.add_argument("input", type=Path, help="directory containing baselines to corrupt")
+    parser.add_argument("--flagdir", type=Path, help="directory to store RFI flags")
+    parser.add_argument("--outdir", type=Path, help="directory to store corrupted baselines")
     parser.add_argument("--seed",
         type=int,
         default=1,
@@ -98,23 +93,26 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    file_input = args.input
-    colname = args.colname
+    dir_input = args.input
+    dir_flag = args.flagdir
+    dir_out = args.outdir
     seed = args.seed
+    
+    # Set up output directory
+    dir_flag.mkdir(parents=True, exist_ok=False)
+    dir_out.mkdir(parents=True, exist_ok=False)
 
-    print(f"Corrupting baselines from {colname} column (Seed: {seed})")
+    print(f"Corrupting baselines from {dir_input.absolute()} (Seed: {seed})")
     np.random.seed(seed)
-    with h5py.File(file_input, "r+") as file:
-        progress = tqdm(file.keys(), total=len(file))
-        for baseline in progress:
-            key = f"{baseline}/{colname}"
 
-            progress.set_description(key)
+    files = sorted(list(dir_input.iterdir()))
+    progress = tqdm(files, total=len(files))
+    for file in progress:
+        progress.set_description(file.name)
+        
+        data = np.load(file, allow_pickle=False)
+        dirty, flag = corrupt_images(np.expand_dims(data, 0))
+        dirty, flag = dirty[0], flag[0]
 
-            data = file[key][...]
-            dirty, flag = corrupt_images(np.expand_dims(data, 0))
-            dirty, flag = dirty[0], flag[0]
-
-            group = file.require_group(baseline)
-            group.create_dataset(FLAG_COL, data=flag, compression="lzf")
-            group.create_dataset(OUTPUT_COL, data=dirty, compression="lzf")
+        np.save(dir_flag.joinpath(file.name), flag, allow_pickle=False)
+        np.save(dir_out.joinpath(file.name), dirty, allow_pickle=False)
