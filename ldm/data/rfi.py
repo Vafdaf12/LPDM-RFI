@@ -1,6 +1,4 @@
-import h5py
 import numpy as np
-import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import Dataset
@@ -8,14 +6,12 @@ import torchvision.transforms as tf
 import torchvision.transforms.functional as F
 
 class BaselineDataset(Dataset):
-    def __init__(self, dataset: str, polarization=0, offset=0, count=-1):
+    def __init__(self, prefix: str):
         print("Dataset instantiated")
-        self.file = h5py.File(dataset, "r")
-        self.baselines = list(self.file.keys())
-        self.polarization = polarization
+        self.flags = np.load(f"{prefix}-flags.npy")
+        self.input = np.load(f"{prefix}-input.npy")
+        self.target = np.load(f"{prefix}-target.npy")
 
-        self.count = len(self.baselines) if count == -1 else count
-        self.offset = offset
         self.transforms = tf.Compose(
             [
                 tf.ToTensor(),
@@ -24,22 +20,16 @@ class BaselineDataset(Dataset):
         )
 
     def __len__(self):
-        return self.count
-
-    def __del__(self):
-        self.file.close()
+        return self.input.shape[0]
 
     def __getitem__(self, idx: int) -> np.ndarray:
-        idx += self.offset
 
-        data = self.file[f"{self.baselines[idx]}/CORRUPTED_DATA"][:, :, self.polarization]
-        clean_data = self.file[f"{self.baselines[idx]}/CORRECTED_DATA"][:, :, self.polarization]
-        flags = self.file[f"{self.baselines[idx]}/FLAG"][:, :, self.polarization]
+        data = self.input[idx]
+        clean_data = self.target[idx]
+        flags = self.flags[idx]
 
         assert data.shape == clean_data.shape, f"Data shape is different: {data.shape} != {clean_data.shape}"
 
-
-        data, clean_data = np.abs(data), np.abs(clean_data)
 
         mean, std = data[~flags].mean(), data[~flags].std()
         data = (data - mean) / std

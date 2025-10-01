@@ -4,7 +4,7 @@ model:
   params:
     linear_start: 0.00085 # For the variance schedule
     linear_end: 0.0120 # For the variance schedule
-    log_every_t: 200 
+    log_every_t: 200
     timesteps: 1000
     first_stage_key: t
     cond_key: x
@@ -53,18 +53,11 @@ data:
     train:
       target: ldm.data.rfi.BaselineDataset
       params:
-        polarization: 0
-        count: 500
-        offset: 0
-        dataset: datasets/output2.h5
+        prefix: datasets/rfi/simulated-train
     validation:
       target: ldm.data.rfi.BaselineDataset
       params:
-        polarization: 0
-        offset: 500
-        count: 50 
-        dataset: datasets/output2.h5
-
+        prefix: datasets/rfi/simulated-test
 
 lightning:
   callbacks:
