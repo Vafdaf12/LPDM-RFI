@@ -161,9 +161,9 @@ def main():
             output = tensor_to_npy(x0)[:, :, 0]
             outputs.append(output)
 
-    print(f"Denoising Complete! Saving results to {config.write_path}")
+    print(f"Denoising Complete! Saving results to {output_path}")
     outputs = np.array(outputs)
-    np.save(config.write_path, outputs, allow_pickle=False)
+    np.save(output_path, outputs, allow_pickle=False)
 
 if __name__ == "__main__":
     main()
