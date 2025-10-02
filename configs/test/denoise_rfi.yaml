@@ -1,5 +1,5 @@
 ddpm_name: lpdm_rfi
-pred_path: ../tmp/inpainted-mean.npy
+pred_path: ../dataset/rfi/sim-test-inpaint-mean.npy
 cond_path: ../datasets/rfi/sim-test-input.npy
 write_path: ../tmp/
 description: Denoise folders
