@@ -54,7 +54,7 @@ def inpaint_noise(inputs: np.ndarray, flags: np.ndarray) -> np.ndarray:
     for i in range(inputs.shape[0]):
         mask = flags[i]
         mean, stdev = eta[i][~mask].mean(), eta[i][~mask].std()
-        noise = np.random.normal(mean, stdev, shape=eta[i].shape)
+        noise = np.random.normal(mean, stdev, size=eta[i].shape)
         eta[i][mask] = noise[mask]
 
     return eta
