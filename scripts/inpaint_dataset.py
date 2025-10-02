@@ -44,7 +44,6 @@ def inpaint_zero(inputs: np.ndarray, flags: np.ndarray) -> np.ndarray:
     eta = inputs.copy()
     for i in range(inputs.shape[0]):
         mask = flags[i]
-        eta[i][mask] = np
         eta[i][mask] = 0
 
     return eta
@@ -55,7 +54,7 @@ def inpaint_noise(inputs: np.ndarray, flags: np.ndarray) -> np.ndarray:
     for i in range(inputs.shape[0]):
         mask = flags[i]
         mean, stdev = eta[i][~mask].mean(), eta[i][~mask].std()
-        noise = np.random.normal(mean, stdev)
+        noise = np.random.normal(mean, stdev, shape=eta[i].shape)
         eta[i][mask] = noise[mask]
 
     return eta
