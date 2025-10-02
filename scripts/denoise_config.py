@@ -87,120 +87,123 @@ def load_model_given_name(name, device = torch.device('cpu')):
 
 seed_everything(0)
 
-parser = argparse.ArgumentParser(prog = 'Denoise Config', description = 'Denoise folders of images based on a configuration file.')
 
-parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise.yaml', help='a string path to the test configuration file')
-parser.add_argument('-s', '--skip_large', action='store_true', help='a flag indicating whether to skip large images which are >2000 pixels in width or height')
-parser.add_argument('-c', '--cut_large', action='store_true', help='a flag indicating whether to cut large images which are >2000 pixels in width or height. Has no effect if skip_large is set.')
-parser.add_argument('-d', '--device', type=str, help='device to move the model and tensors to. Either cuda or cpu.', default='cpu')
-parser.add_argument('-o', '--overwrite', action='store_true', help='overwrite existing images rather than skipping the denoising process.')
-args = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser(prog = 'Denoise Config', description = 'Denoise folders of images based on a configuration file.')
 
-config_path = args.base_path
-config = OmegaConf.load(config_path)
-subdir = os.path.join(config.write_path, config.ddpm_name, f'phi{config.phi}_s{config.s}')
-os.makedirs(subdir, exist_ok=True)
+    parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise.yaml', help='a string path to the test configuration file')
+    parser.add_argument('-d', '--device', type=str, help='device to move the model and tensors to. Either cuda or cpu.', default='cpu')
+    parser.add_argument('-o', '--overwrite', action='store_true', help='overwrite existing images rather than skipping the denoising process.')
+    args = parser.parse_args()
 
-print(f'Checking {config_path}...')
-# Config has not been denoised yet
-write_path = os.path.join(config.write_path, config.ddpm_name, f'phi{config.phi}_s{config.s}')
+    config_path = args.base_path
+    config = OmegaConf.load(config_path)
+    subdir = os.path.join(config.write_path, config.ddpm_name, f'phi{config.phi}_s{config.s}')
+    os.makedirs(subdir, exist_ok=True)
 
-pred_paths, cond_paths = sorted(glob.glob(config.pred_path)), sorted(glob.glob(config.cond_path))
-assert len(pred_paths) == len(cond_paths), f"Number of images in folders do not match: {len(pred_paths)} != {len(cond_paths)}"
+    print(f'Checking {config_path}...')
+    # Config has not been denoised yet
+    write_path = os.path.join(config.write_path, config.ddpm_name, f'phi{config.phi}_s{config.s}')
 
-for p, c in zip(pred_paths, cond_paths):
-    assert os.path.splitext(os.path.basename(p))[0] == os.path.splitext(os.path.basename(c))[0], f'{os.path.basename(p)} != {os.path.basename(c)}'
-    assert is_numpy_file(p) == is_numpy_file(c)
+    pred_paths, cond_paths = sorted(glob.glob(config.pred_path)), sorted(glob.glob(config.cond_path))
+    assert len(pred_paths) == len(cond_paths), f"Number of images in folders do not match: {len(pred_paths)} != {len(cond_paths)}"
 
-print(f'Denoising {config_path}...')
+    for p, c in zip(pred_paths, cond_paths):
+        assert os.path.splitext(os.path.basename(p))[0] == os.path.splitext(os.path.basename(c))[0], f'{os.path.basename(p)} != {os.path.basename(c)}'
+        assert is_numpy_file(p) == is_numpy_file(c)
 
-device = torch.device(args.device)
-ddpm = load_model_given_name(config.ddpm_name).to(device)
+    print(f'Denoising {config_path}...')
 
-os.makedirs(write_path, exist_ok=True)
+    device = torch.device(args.device)
+    ddpm = load_model_given_name(config.ddpm_name).to(device)
 
-def pad_to_multiple(im, mul=16):
-    h, w = im.shape[2], im.shape[3]
-    H, W = ((h + mul) // mul) * mul, ((w + mul) // mul) * mul
-    padh = H - h if h % mul != 0 else 0
-    padw = W - w if w % mul != 0 else 0
-    return torch.nn.functional.pad(im, (0, padw, 0, padh), mode='reflect')
+    os.makedirs(write_path, exist_ok=True)
+
+    def pad_to_multiple(im, mul=16):
+        h, w = im.shape[2], im.shape[3]
+        H, W = ((h + mul) // mul) * mul, ((w + mul) // mul) * mul
+        padh = H - h if h % mul != 0 else 0
+        padw = W - w if w % mul != 0 else 0
+        return torch.nn.functional.pad(im, (0, padw, 0, padh), mode='reflect')
 
 
-with torch.no_grad():
-    for p_path, c_path  in tqdm(zip(pred_paths, cond_paths), total=len(pred_paths)):
-        if is_numpy_file(p_path):
-            save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.npy')
-        else:
-            save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.png')
+    with torch.no_grad():
+        for p_path, c_path  in tqdm(zip(pred_paths, cond_paths), total=len(pred_paths)):
+            if is_numpy_file(p_path):
+                save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.npy')
+            else:
+                save_path = os.path.join(write_path, f'{os.path.splitext(os.path.basename(p_path))[0]}.png')
 
-        if os.path.exists(save_path) and not args.overwrite:
-            print(f'File {save_path} already exists, skipping...')
-            continue
+            if os.path.exists(save_path) and not args.overwrite:
+                print(f'File {save_path} already exists, skipping...')
+                continue
 
-        if is_numpy_file(p_path):
-            p, c = np.load(p_path), np.load(c_path)
-            p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
-            p, c = numpy_to_tensor(p).unsqueeze(0), numpy_to_tensor(c).unsqueeze(0)
-            #p, c = numpy_to_tensor(p), numpy_to_tensor(c)
-            print(p.shape, c.shape)
-            #raise "Numpy eish"
-        else:
-            p, c = Image.open(p_path), Image.open(c_path)
-            p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
-            print(p.shape, c.shape)
-            continue
-            #raise "Picture eish"
+            if is_numpy_file(p_path):
+                p, c = np.load(p_path), np.load(c_path)
+                p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
+                p, c = numpy_to_tensor(p).unsqueeze(0), numpy_to_tensor(c).unsqueeze(0)
+                #p, c = numpy_to_tensor(p), numpy_to_tensor(c)
+                print(p.shape, c.shape)
+                #raise "Numpy eish"
+            else:
+                p, c = Image.open(p_path), Image.open(c_path)
+                p, c = pil_to_tensor_in_range(p).unsqueeze(0), pil_to_tensor_in_range(c).unsqueeze(0)
+                print(p.shape, c.shape)
+                continue
+                #raise "Picture eish"
 
-        p, c = p.to(device), c.to(device)
-        print(p.shape)
-        if  p.shape[-1] >= 2000 or p.shape[-2] >=2000:
-                if args.skip_large:
-                    print(f'Skipping large image of size: {p.shape}')
-                    continue
-                elif args.cut_large:
-                    print(f'Cutting image of size: {p.shape}')
-                    # Split large tensors in half:
-                    split_point = p.shape[-1] // 2 # split on width
-                    left_p = p[..., :split_point]
-                    right_p = p[..., split_point:]
-                    left_c = c[..., :split_point]
-                    right_c = c[..., split_point:]
-                    denoised_pieces = []
-                    for slice_p, slice_c in [(left_p, left_c), (right_p, right_c)]:
-                        t = torch.tensor([config.phi], dtype=torch.long).to(device)
-                        try:
-                            noise_pred = ddpm.model(torch.cat([slice_p, slice_c], dim=1), t).detach()
-                            x0 = ddpm.predict_start_from_noise(slice_p, torch.tensor([config.s], device=device).long(), noise_pred).detach()
-                        except:
-                            h, w = slice_p.shape[-2], slice_p.shape[-1]
-                            noise_pred = ddpm.model(torch.cat([pad_to_multiple(slice_p), pad_to_multiple(slice_c)], dim=1), t).detach()
-                            x0 = ddpm.predict_start_from_noise(pad_to_multiple(slice_p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
-                            x0 = x0[..., :h, :w]
-                        denoised_pieces.append(x0)
-                    x0 = torch.cat(denoised_pieces, dim=-1) # Concat on width
+            p, c = p.to(device), c.to(device)
+            print(p.shape)
+            if  p.shape[-1] >= 2000 or p.shape[-2] >=2000:
+                    if args.skip_large:
+                        print(f'Skipping large image of size: {p.shape}')
+                        continue
+                    elif args.cut_large:
+                        print(f'Cutting image of size: {p.shape}')
+                        # Split large tensors in half:
+                        split_point = p.shape[-1] // 2 # split on width
+                        left_p = p[..., :split_point]
+                        right_p = p[..., split_point:]
+                        left_c = c[..., :split_point]
+                        right_c = c[..., split_point:]
+                        denoised_pieces = []
+                        for slice_p, slice_c in [(left_p, left_c), (right_p, right_c)]:
+                            t = torch.tensor([config.phi], dtype=torch.long).to(device)
+                            try:
+                                noise_pred = ddpm.model(torch.cat([slice_p, slice_c], dim=1), t).detach()
+                                x0 = ddpm.predict_start_from_noise(slice_p, torch.tensor([config.s], device=device).long(), noise_pred).detach()
+                            except:
+                                h, w = slice_p.shape[-2], slice_p.shape[-1]
+                                noise_pred = ddpm.model(torch.cat([pad_to_multiple(slice_p), pad_to_multiple(slice_c)], dim=1), t).detach()
+                                x0 = ddpm.predict_start_from_noise(pad_to_multiple(slice_p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
+                                x0 = x0[..., :h, :w]
+                            denoised_pieces.append(x0)
+                        x0 = torch.cat(denoised_pieces, dim=-1) # Concat on width
 
-                    if is_numpy_file(c_path):
-                        np.save(save_path, tensor_to_npy(x0))
-                    else:
-                        x0 = clamp_ldm_range(x0)
-                        tensor_to_pil(x0).save(save_path)
-                    continue
+                        if is_numpy_file(c_path):
+                            np.save(save_path, tensor_to_npy(x0))
+                        else:
+                            x0 = clamp_ldm_range(x0)
+                            tensor_to_pil(x0).save(save_path)
+                        continue
 
-        t = torch.tensor([config.phi], dtype=torch.long, device=device)
-        try:
-            noise_pred = ddpm.model(torch.cat([p, c], dim=1), t).detach()
-            x0 = ddpm.predict_start_from_noise(p, torch.tensor([config.s], device=device).long(), noise_pred).detach()
-        except:
-            h, w = p.shape[-2], p.shape[-1]
-            noise_pred = ddpm.model(torch.cat([pad_to_multiple(p), pad_to_multiple(c)], dim=1), t).detach()
-            x0 = ddpm.predict_start_from_noise(pad_to_multiple(p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
-            x0 = x0[..., :h, :w]
+            t = torch.tensor([config.phi], dtype=torch.long, device=device)
+            try:
+                noise_pred = ddpm.model(torch.cat([p, c], dim=1), t).detach()
+                x0 = ddpm.predict_start_from_noise(p, torch.tensor([config.s], device=device).long(), noise_pred).detach()
+            except:
+                h, w = p.shape[-2], p.shape[-1]
+                noise_pred = ddpm.model(torch.cat([pad_to_multiple(p), pad_to_multiple(c)], dim=1), t).detach()
+                x0 = ddpm.predict_start_from_noise(pad_to_multiple(p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
+                x0 = x0[..., :h, :w]
 
-        if is_numpy_file(c_path):
-            np.save(save_path, tensor_to_npy(x0))
-        else:
-            x0 = clamp_ldm_range(x0)
-            tensor_to_pil(x0).save(save_path)
+            if is_numpy_file(c_path):
+                np.save(save_path, tensor_to_npy(x0))
+            else:
+                x0 = clamp_ldm_range(x0)
+                tensor_to_pil(x0).save(save_path)
 
-print("Denoising Complete!")
+    print("Denoising Complete!")
+
+if __name__ == "__main__":
+    main()
