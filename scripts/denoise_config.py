@@ -100,7 +100,7 @@ def pad_to_multiple(im, mul=16):
 class Config:
     ddpm_name: str
     pred_path: str
-    cond_path: str
+    cond_name: str
     write_path: str
     description: str
     s: int
@@ -122,13 +122,14 @@ def main():
     config = OmegaConf.to_object(config) #type: ignore
 
     print("Checking configuration...")
-    output_path = Path(config.write_path) / f'phi{config.phi}_s{config.s}'
+    output_path = Path(config.write_path) / f'phi{config.phi}_s{config.s}.npy'
     assert args.overwrite or not output_path.exists(), f"Output file {output_path} already exists, but --overwrite was not set."
     Path(config.write_path).mkdir(parents=True, exist_ok=True)
 
     print("Loading datasets...")
     preds = np.load(config.pred_path)
-    conds = np.load(config.cond_path)
+    conds = np.load(f"{config.cond_name}-input.npy")
+    flags = np.load(f"{config.cond_name}-flags.npy")
     assert len(preds.shape) == len(conds.shape), f"Shape of datasets do not match: {preds.shape} != {conds.shape}"
 
     print(f"Loading model with name {config.ddpm_name}...")
@@ -138,27 +139,35 @@ def main():
     print(f'Denoising using phi={config.phi}, s={config.s}...')
     outputs = []
     with torch.no_grad():
-        for p, c in tqdm(zip(preds, conds), total=preds.shape[0]):
+        for i in tqdm(range(preds.shape[0]), total=preds.shape[0]):
+            pred, cond, flag = preds[i], conds[i], flags[i]
+
+            # Standardize according to the unflagged condition
+            mean, stdev = np.mean(cond[~flag]), np.std(cond[~flag])
+            pred = (pred - mean) / stdev
+            cond = (cond - mean) / stdev
+
             # Transform into WxHx1, then 1xHxW
-            p, c = np.expand_dims(p, axis=2), np.expand_dims(c, axis=2)
-            p, c = np.swapaxes(p, 0, 2), np.swapaxes(c, 0, 2)
+            pred, cond = np.expand_dims(pred, axis=2), np.expand_dims(cond, axis=2)
+            pred, cond = np.swapaxes(pred, 0, 2), np.swapaxes(cond, 0, 2)
 
             # Transform into batch of size 1 (sad)
-            p, c = numpy_to_tensor(p).unsqueeze(0), numpy_to_tensor(c).unsqueeze(0)
-            p, c = p.to(device), c.to(device)
+            pred, cond = numpy_to_tensor(pred).unsqueeze(0), numpy_to_tensor(cond).unsqueeze(0)
+            pred, cond = pred.to(device), cond.to(device)
 
             t = torch.tensor([config.phi], dtype=torch.long, device=device)
             try:
-                noise_pred = ddpm.model(torch.cat([p, c], dim=1), t).detach()
-                x0 = ddpm.predict_start_from_noise(p, torch.tensor([config.s], device=device).long(), noise_pred).detach()
+                noise_pred = ddpm.model(torch.cat([pred, cond], dim=1), t).detach()
+                x0 = ddpm.predict_start_from_noise(pred, torch.tensor([config.s], device=device).long(), noise_pred).detach()
             except:
-                h, w = p.shape[-2], p.shape[-1]
-                noise_pred = ddpm.model(torch.cat([pad_to_multiple(p), pad_to_multiple(c)], dim=1), t).detach()
-                x0 = ddpm.predict_start_from_noise(pad_to_multiple(p), torch.tensor([config.s], device=device).long(), noise_pred).detach()
+                h, w = pred.shape[-2], pred.shape[-1]
+                noise_pred = ddpm.model(torch.cat([pad_to_multiple(pred), pad_to_multiple(cond)], dim=1), t).detach()
+                x0 = ddpm.predict_start_from_noise(pad_to_multiple(pred), torch.tensor([config.s], device=device).long(), noise_pred).detach()
                 x0 = x0[..., :h, :w]
 
 
             output = tensor_to_npy(x0)[:, :, 0]
+            output = mean + (output * stdev)
             outputs.append(output)
 
     print(f"Denoising Complete! Saving results to {output_path}")
