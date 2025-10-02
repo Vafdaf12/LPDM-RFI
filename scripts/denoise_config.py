@@ -99,9 +99,9 @@ def pad_to_multiple(im, mul=16):
 @dataclass
 class Config:
     ddpm_name: str
-    pred_path: Path
-    cond_path: Path
-    write_path: Path
+    pred_path: str
+    cond_path: str
+    write_path: str
     description: str
     s: int
     phi: int
@@ -122,9 +122,9 @@ def main():
     config = OmegaConf.to_object(config) #type: ignore
 
     print("Checking configuration...")
-    output_path = config.write_path / f'phi{config.phi}_s{config.s}'
+    output_path = Path(config.write_path) / f'phi{config.phi}_s{config.s}'
     assert args.overwrite or not output_path.exists(), f"Output file {output_path} already exists, but --overwrite was not set."
-    config.write_path.mkdir(parents=True, exist_ok=True)
+    Path(config.write_path).mkdir(parents=True, exist_ok=True)
 
     print("Loading datasets...")
     preds = np.load(config.pred_path)
