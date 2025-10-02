@@ -158,11 +158,12 @@ def main():
                 x0 = x0[..., :h, :w]
 
 
-            output = tensor_to_npy(x0)
-            print(output.shape)
-            raise Exception("Testing shape")
+            output = tensor_to_npy(x0)[:, :, 0]
+            outputs.append(output)
 
-    print("Denoising Complete!")
+    print(f"Denoising Complete! Saving results to {config.write_path}")
+    outputs = np.array(outputs)
+    np.save(config.write_path, outputs, allow_pickle=False)
 
 if __name__ == "__main__":
     main()
