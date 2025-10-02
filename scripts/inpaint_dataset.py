@@ -16,14 +16,19 @@ def main():
     )
     args = parser.parse_args()
 
+    print("Loading datasets:")
+    print(f"- {args.name}-input.npy")
+    print(f"- {args.name}-flags.npy")
     np.random.seed(1)
     inputs = np.load(f"{args.name}-input.npy")
     flags = np.load(f"{args.name}-flags.npy")
 
+
+    print(f"Inpainting using '{args.method}' method...")
     eta = METHODS[args.method](inputs, flags)
+
+    print(f"Saving results to '{args.name}-inpaint-{args.method}.npy'")
     np.save(f"{args.name}-inpaint-{args.method}.npy", eta, allow_pickle=False)
-
-
 
 def inpaint_mean(inputs: np.ndarray, flags: np.ndarray) -> np.ndarray:
     """In-paints an RFI-corrupted baseline using the mean value of the unflagged data"""
