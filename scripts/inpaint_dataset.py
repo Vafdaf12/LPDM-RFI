@@ -12,7 +12,6 @@ def main():
     parser.add_argument("name", type=str, help="name prefix of the dataset")
     parser.add_argument("--method",
         choices=list(METHODS.keys()),
-        default="clean",
         help="method used for inpainting",
     )
     args = parser.parse_args()
