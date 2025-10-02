@@ -129,7 +129,7 @@ def main():
     print("Loading datasets...")
     preds = np.load(config.pred_path)
     conds = np.load(config.cond_path)
-    assert len(preds.shape[0]) == len(conds.shape[0]), f"Number of spectrograms in datasets do not match: {preds.shape[0]} != {conds.shape[0]}"
+    assert len(preds.shape) == len(conds.shape), f"Shape of datasets do not match: {preds.shape} != {conds.shape}"
 
     print(f"Loading model with name {config.ddpm_name}...")
     device = torch.device(args.device)
