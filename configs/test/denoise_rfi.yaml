@@ -3,8 +3,8 @@ checkpoint_path: ../checkpoints/lpdm_rfi.ckpt
 config_path: ../configs/train/lpdm_rfi.yaml
 
 # Where to load the dataset to denoise
-pred_path: ../dataset/rfi/sim-test-inpaint-mean.npy
-cond_path: ../datasets/rfi/sim-test-input.npy
+pred_path: ../datasets/rfi/sim-test-inpaint-mean.npy
+cond_name: ../datasets/rfi/sim-test
 
 # Folder where the data will be output
 write_path: ../tmp/

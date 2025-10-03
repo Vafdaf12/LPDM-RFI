@@ -78,7 +78,7 @@ def main():
     seed_everything(0)
     parser = argparse.ArgumentParser(prog = 'Denoise Config', description = 'Denoise folders of images based on a configuration file.')
 
-    parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise.yaml', help='a string path to the test configuration file')
+    parser.add_argument('-b', '--base_path', type=str, default='../configs/test/denoise_rfi.yaml', help='a string path to the test configuration file')
     parser.add_argument('-d', '--device', type=str, help='device to move the model and tensors to. Either cuda or cpu.', default='cpu')
     parser.add_argument('-o', '--overwrite', action='store_true', help='overwrite existing images rather than skipping the denoising process.')
     args = parser.parse_args()
