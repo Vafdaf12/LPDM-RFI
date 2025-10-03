@@ -22,32 +22,21 @@ class Args:
 if __name__ == "__main__":
     from argparse import ArgumentParser
     parser = ArgumentParser(prog = 'Calculate metrics for a config', description = 'Denoise all configs')
-    parser.add_argument('--target', type=Path, help="directory containing the target outputs of the model") 
-    parser.add_argument('--pred', type=Path, help="directory containing predictions from the model") 
-    parser.add_argument('-o', '--output', required=True, type=Path, help="where to save the output .csv file") 
-    args = Args(**vars(parser.parse_args()))
-    print("Configuration:", args)
-    
-    df_pre = pd.read_csv(args.target.joinpath("..", "summary.csv"),index_col=0)
-    
+    parser.add_argument('--target', type=Path, help="dataset containing the target outputs of the model")
+    parser.add_argument('--pred', type=Path, help="dataset containing predictions from the model")
+    args = parser.parse_args()
+
+    pred, target = np.load(args.pred, args.target)
+
     results = []
     files = list(args.pred.iterdir())
-    for pred_path in tqdm(files, total=len(files)):
-        target_path = args.target.joinpath(pred_path.name)
-        pre = df_pre.loc[pred_path.stem]
-        
-        pred = (np.load(pred_path, allow_pickle=False) *pre["stdev"])+pre["mean"]
-        pred = pred[:,:,0]
+    for pred, target in tqdm(files, total=len(files)):
+        metrics = evaluate(pred, target)
+        results.append(metrics)
 
-        target = (np.load(target_path, allow_pickle=False)*pre["stdev"])+pre["mean"]
-
-        metric = evaluate(pred, target)
-        metric["file"] = pred_path.name
-        results.append(metric)
-
-    df_metrics = pd.DataFrame(results)
-    df_metrics.set_index("file", inplace=True)
-    df_metrics.to_csv(args.output)
+    df = pd.DataFrame(results)
+    print(df.mean())
+    print(df.std())
 
 # print(f'Scanning configs...')
 # results_csv = '../test/results.csv'
@@ -55,11 +44,11 @@ if __name__ == "__main__":
 # fr = FullReferenceMeasure()
 # nr = NoReferenceMeasure()
 
-# # for config_path in glob.glob('../configs/metrics/**/*.yaml', recursive=True):    
+# # for config_path in glob.glob('../configs/metrics/**/*.yaml', recursive=True):
 # config_path = args.base_path
 
 # if not args.no_skip and os.path.isfile(results_csv):
-#     current_results = pd.read_csv(results_csv, index_col='file') 
+#     current_results = pd.read_csv(results_csv, index_col='file')
 #     if os.path.basename(config_path) in current_results.index:
 #         print(f'Skipping: {os.path.basename(config_path)}')
 #         exit()
@@ -105,7 +94,7 @@ if __name__ == "__main__":
 # df = df.set_index('file')
 
 # head, _ = os.path.split(config.pred_path)
-# denosing_configs = glob.glob(os.path.join(head, '*.yaml')) # denoiser writes its config to the pred dir 
+# denosing_configs = glob.glob(os.path.join(head, '*.yaml')) # denoiser writes its config to the pred dir
 # if denosing_configs:
 #     assert len(denosing_configs) == 1, "Found too many denoising configs"
 #     denoising_config = OmegaConf.load(denosing_configs[0])
@@ -116,10 +105,10 @@ if __name__ == "__main__":
 
 # if not os.path.isfile(results_csv):
 #     df.to_csv(results_csv, header='column_names')
-# else: 
-#     current = pd.read_csv(results_csv, index_col='file')  
-#     current = pd.concat([current, df], join='outer')      
-#     # current = pd.concat([current, df], how='outer', on='file')      
-#     current.to_csv(results_csv)   
+# else:
+#     current = pd.read_csv(results_csv, index_col='file')
+#     current = pd.concat([current, df], join='outer')
+#     # current = pd.concat([current, df], how='outer', on='file')
+#     current.to_csv(results_csv)
 
 # print("Metric calculations complete!")
