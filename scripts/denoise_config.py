@@ -4,10 +4,8 @@ import glob
 import torch
 import numpy as np
 from omegaconf import OmegaConf
-from PIL import Image
 
 from tqdm import tqdm
-from einops import rearrange
 from pytorch_lightning import seed_everything
 import torch
 import torchvision.transforms as T
@@ -20,47 +18,14 @@ from ldm.util import instantiate_from_config
 from dataclasses import dataclass
 from pathlib import Path
 
-
-def tensor_to_pil(t, mode='RGB'):
-    if t.ndim == 4:
-        assert t.shape[0] == 1
-        t = t[0]
-    t = torch.clamp((t + 1.0) / 2.0, min=0.0, max=1.0)
-    img = 255. * rearrange(t.detach().cpu().numpy(), 'c h w -> h w c')
-    return Image.fromarray(img.astype(np.uint8), mode=mode).convert('RGB')
-
 def tensor_to_npy(t):
     arr = t.cpu().numpy()[0]
     arr = np.swapaxes(arr, 0, 2)
     return arr
 
-
-
-def is_numpy_file(path: str) -> bool:
-    if not os.path.isfile(path):
-        return False
-
-    ext = os.path.splitext(path)[1]
-    return ext in (".npy", ".npz")
-
 def numpy_to_tensor(t):
-
     return torch.from_numpy(t)
     #return T.ToTensor()(t)
-
-def pil_to_tensor_in_range(t):
-    return T.ToTensor()(t) * 2.0 - 1.0
-
-def clamp_ldm_range(t):
-    return torch.clamp(t, -1.0, 1.0)
-
-def ldm_range_to_rgb_range(t):
-    t = clamp_ldm_range(t)
-    return (t + 1.0) / 2.0
-
-def get_diff_loss_prediction(diffloss_model, z_m, z_x):
-    t_ = torch.full((z_x.shape[0],), 0).long()
-    return diffloss_model.diffusion_model.apply_model(torch.cat([z_m, z_x],dim=1), t_, cond=None).detach()
 
 def load_model_from_config(config, ckpt, verbose=False):
     print(f"Loading model checkpoint from {ckpt}")
