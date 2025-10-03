@@ -63,7 +63,7 @@ def get_diff_loss_prediction(diffloss_model, z_m, z_x):
     return diffloss_model.diffusion_model.apply_model(torch.cat([z_m, z_x],dim=1), t_, cond=None).detach()
 
 def load_model_from_config(config, ckpt, verbose=False):
-    print(f"Loading model from {ckpt}")
+    print(f"Loading model checkpoint from {ckpt}")
     pl_sd = torch.load(ckpt, map_location="cpu")
     if "global_step" in pl_sd:
         print(f"Global Step: {pl_sd['global_step']}")
@@ -78,12 +78,13 @@ def load_model_from_config(config, ckpt, verbose=False):
         print(u)
     return model
 
-def load_model_given_name(name, device = torch.device('cpu')):
-    config_path = os.path.join('../checkpoints',  f'{name}.yaml')
+def load_model_from_path(config_path: str, ckpt_path: str, device = torch.device('cpu')):
+    print(f"Loading model configuration from {config_path}")
     config = OmegaConf.load(config_path)
     if 'first_stage_config' in config.model.params and not config.model.params.first_stage_config.params.ckpt_path.startswith('..') :
         config.model.params.first_stage_config.params.ckpt_path = os.path.join('..', config.model.params.first_stage_config.params.ckpt_path)
-    model = load_model_from_config(config, f'{config_path[:-5]}.ckpt') # Assume the config is the same name
+
+    model = load_model_from_config(config, ckpt_path)
     model = model.to(device)
     _ = model.eval()
     return model
@@ -98,11 +99,12 @@ def pad_to_multiple(im, mul=16):
 
 @dataclass
 class Config:
-    ddpm_name: str
+    checkpoint_path: str
+    config_path: str
+
     pred_path: str
     cond_name: str
     write_path: str
-    description: str
     s: int
     phi: int
 
@@ -132,9 +134,9 @@ def main():
     flags = np.load(f"{config.cond_name}-flags.npy")
     assert len(preds.shape) == len(conds.shape), f"Shape of datasets do not match: {preds.shape} != {conds.shape}"
 
-    print(f"Loading model with name {config.ddpm_name}...")
+    print(f"Loading model...")
     device = torch.device(args.device)
-    ddpm = load_model_given_name(config.ddpm_name).to(device)
+    ddpm = load_model_from_path(config.config_path, config.checkpoint_path).to(device)
 
     print(f'Denoising using phi={config.phi}, s={config.s}...')
     outputs = []

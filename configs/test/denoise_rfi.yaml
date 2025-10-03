@@ -1,7 +1,14 @@
-ddpm_name: lpdm_rfi
+# Where to load the model checkpoint from
+checkpoint_path: ../checkpoints/lpdm_rfi.ckpt
+config_path: ../configs/train/lpdm_rfi.yaml
+
+# Where to load the dataset to denoise
 pred_path: ../dataset/rfi/sim-test-inpaint-mean.npy
 cond_path: ../datasets/rfi/sim-test-input.npy
+
+# Folder where the data will be output
 write_path: ../tmp/
-description: Denoise folders
+
+# LPDM parameters
 s: 10
 phi: 200
