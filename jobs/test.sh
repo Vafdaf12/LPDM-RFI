@@ -23,4 +23,4 @@ echo "Running testing"
 cd scripts
 
 # Run denoising
-python denoise_config.py ../configs/test/denoise.yaml  --device cuda
+python denoise_config.py ../configs/test/denoise.yaml  --device cuda --overwrite

@@ -4,8 +4,6 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from tqdm import tqdm
-
 
 def evaluate(pred: np.ndarray, target: np.ndarray) -> dict:
     return {
@@ -13,30 +11,41 @@ def evaluate(pred: np.ndarray, target: np.ndarray) -> dict:
         "mae": np.mean(np.absolute(pred - target))
     }
 
-@dataclass
-class Args:
-    target: Path
-    pred: Path
-    output: Path
-
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    parser = ArgumentParser(prog = 'Calculate metrics for a config', description = 'Denoise all configs')
-    parser.add_argument('--target', type=Path, help="dataset containing the target outputs of the model")
-    parser.add_argument('--pred', type=Path, help="dataset containing predictions from the model")
+    parser = ArgumentParser()
+    parser.add_argument('pred',
+        type=Path,
+        help="dataset containing predictions from the model"
+    )
+    parser.add_argument('-t', '--target',
+        type=Path,
+        required=True,
+        help="dataset containing the target outputs of the model"
+    )
+    parser.add_argument('-o', '--output',
+        type=Path,
+        required=True,
+        help="location to output the calculated metrics"
+    )
     args = parser.parse_args()
 
-    pred, target = np.load(args.pred, args.target)
+    pred, target = np.load(args.pred), np.load(args.target)
+    assert len(pred.shape) == len(target.shape), f"Shape of datasets do not match: {pred.shape} != {target.shape}"
 
+    print("Calculating metrics...")
     results = []
-    files = list(args.pred.iterdir())
-    for pred, target in tqdm(files, total=len(files)):
+    for pred, target in zip(pred, target):
         metrics = evaluate(pred, target)
         results.append(metrics)
 
     df = pd.DataFrame(results)
-    print(df.mean())
-    print(df.std())
+    means = df.mean()
+    stdevs = df.std()
+    for i, (m, s) in enumerate(zip(means, stdevs)):
+        print(f"{means.index[i]}:\t {m} ± {s}")
+
+    df.to_csv(args.output)
 
 # print(f'Scanning configs...')
 # results_csv = '../test/results.csv'
