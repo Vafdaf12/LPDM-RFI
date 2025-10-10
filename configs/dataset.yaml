@@ -1,0 +1,32 @@
+# To be used with scripts/create_dataset to create training data for LPDM
+
+# Path to the measurement set.
+ms_path: data 
+
+# Name of the column containing the baselines to corrupt.
+column: "DATA" 
+
+# Which polarization number to use.
+polarization: 0 
+
+# What percentage of the measurement set will be used for a test set.
+test_size: 0.2 
+
+# The script generates 6 files:
+# - {prefix}-{train|test}-target.npy
+# - {prefix}-{train|test}-flags.npy
+# - {prefix}-{train|test}-input.npy
+prefix: dataset
+
+# Configuration for how the RFI is generated
+corruption:
+  seed: 1
+  lines:
+    brightness_range: [0.05, 0.20]
+    count_range: [0, 4]
+  dashes:
+    brightness_range: [0.10, 0.50]
+    count_range: [1, 10]
+  blocks:
+    brightness_range: [0.10, 0.50]
+    count_range: [1, 3]
