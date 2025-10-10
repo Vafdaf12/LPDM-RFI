@@ -28,5 +28,5 @@ cd scripts
 
 for config in $(find ../workspace/grid-search/configs/$METHOD -type f); do
     echo "---------------------------------------------------------------- $method  $config"
-    python denoise_config.py --base_path $config  --device cuda --overwrite
+    python denoise_config.py $config  --device cuda --overwrite
 done
